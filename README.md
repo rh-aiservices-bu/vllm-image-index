@@ -2,7 +2,7 @@
 
 Kustomize-based deployment for the vLLM Image Index: a small web application that lists vLLM container images from Red Hat registries and DockerHub, updated daily by a CronJob.
 
-![image](./img/ui.png)
+![image](./img/UI.png)
 
 ## How it works
 
