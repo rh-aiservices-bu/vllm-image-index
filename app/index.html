@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vLLM Image Index</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+      color: #1a1a1a;
+      background: #fff;
+    }
+
+    h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
+    .meta { color: #777; font-size: 0.82rem; margin-bottom: 1.75rem; }
+
+    .filters {
+      display: flex;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      margin-bottom: 0.75rem;
+      padding: 1rem 1.25rem;
+      background: #f7f7f7;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+    }
+    .filter-group { display: flex; flex-direction: column; gap: 0.3rem; }
+    .filter-group label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    select {
+      padding: 0.4rem 0.6rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      min-width: 180px;
+      background: #fff;
+    }
+    .reset-btn {
+      padding: 0.4rem 0.8rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      background: #fff;
+      cursor: pointer;
+      align-self: flex-end;
+      color: #555;
+    }
+    .reset-btn:hover { background: #f0f0f0; }
+
+    /* "Supported by Red Hat" as an explicit filter control */
+    .filter-group-rh {
+      border-left: 3px solid #b91c1c;
+      padding-left: 0.85rem;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.84rem;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 0.38rem 0.65rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .checkbox-label:hover { background: #fef2f2; border-color: #f9a8a8; }
+    .checkbox-label input[type="checkbox"] { cursor: pointer; accent-color: #b91c1c; width: 14px; height: 14px; }
+
+
+
+    .count { font-size: 0.82rem; color: #666; margin-bottom: 0.5rem; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    thead th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 2px solid #ddd;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #666;
+      white-space: nowrap;
+      background: #fafafa;
+    }
+    thead th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th.sortable:hover { background: #f0f0f0; color: #333; }
+    thead th.sortable.sorted { color: #1a1a1a; }
+    .sort-ind { margin-left: 0.3rem; opacity: 0.3; font-size: 0.65rem; }
+    th.sorted .sort-ind { opacity: 1; }
+
+    td {
+      padding: 0.45rem 0.75rem;
+      border-bottom: 1px solid #efefef;
+      vertical-align: middle;
+    }
+    tr:hover td { background: #fbfbfb; }
+    tr.detail-row:hover td { background: #f4f4f4; }
+    tr.detail-row td {
+      padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+      background: #f7f7f7;
+      border-bottom: 1px solid #e8e8e8;
+      font-size: 0.8rem;
+    }
+    .detail-content { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: center; }
+    .detail-item { display: flex; gap: 0.4rem; align-items: center; }
+    .detail-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #888; }
+
+    .mono { font-family: ui-monospace, 'Cascadia Code', monospace; font-size: 0.82rem; }
+
+    .ref-cell { display: flex; align-items: center; gap: 0.4rem; }
+    .ref-text {
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+      font-size: 0.78rem;
+      color: #333;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 480px;
+    }
+    .copy-btn {
+      flex-shrink: 0;
+      padding: 0.18rem 0.55rem;
+      font-size: 0.72rem;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      background: #f5f5f5;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .copy-btn:hover { background: #e8e8e8; }
+    .copy-btn.copied { background: #d4edda; border-color: #b8dfc5; color: #155724; }
+
+    .info-btn {
+      flex-shrink: 0;
+      padding: 0.18rem 0.45rem;
+      font-size: 0.72rem;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      background: #f5f5f5;
+      cursor: pointer;
+      color: #555;
+      line-height: 1;
+    }
+    .info-btn:hover { background: #e8e8e8; }
+    .info-btn.active { background: #1e40af; color: #fff; border-color: #1e40af; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 3px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .hw-cuda    { background: #dbeafe; color: #1e40af; }
+    .hw-rocm    { background: #fce7f3; color: #9d174d; }
+    .hw-cpu     { background: #dcfce7; color: #166534; }
+    .hw-gaudi   { background: #ffedd5; color: #9a3412; }
+    .hw-tpu     { background: #ede9fe; color: #5b21b6; }
+    .hw-ironwood{ background: #f3e8ff; color: #6b21a8; }
+    .hw-xpu     { background: #ecfdf5; color: #065f46; }
+    .hw-neuron  { background: #fef9c3; color: #854d0e; }
+    .hw-spyre   { background: #e0f2fe; color: #075985; }
+    .hw-unknown { background: #f3f4f6; color: #374151; }
+
+    .os-rhel   { background: #fef2f2; color: #991b1b; }
+    .os-ubuntu { background: #fef9c3; color: #713f12; }
+    .os-other  { background: #f3f4f6; color: #374151; }
+
+    .about-btn {
+      padding: 0.4rem 0.8rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      background: #fff;
+      cursor: pointer;
+      align-self: flex-end;
+      color: #555;
+    }
+    .about-btn:hover { background: #f0f0f0; }
+    .about-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
+    .about-panel {
+      display: none;
+      margin-bottom: 0.75rem;
+      padding: 1rem 1.25rem;
+      background: #f7f7f7;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+    .about-panel.visible { display: block; }
+    .about-panel h3 { margin: 0 0 0.5rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: #555; }
+    .about-panel table { font-size: 0.82rem; margin-bottom: 0.75rem; }
+    .about-panel table:last-child { margin-bottom: 0; }
+    .about-panel th { font-size: 0.72rem; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.2rem 0.75rem 0.2rem 0; border-bottom: 1px solid #ddd; }
+    .about-panel td { padding: 0.25rem 0.75rem 0.25rem 0; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    .about-panel td:first-child { white-space: nowrap; }
+    .about-panel code { font-family: ui-monospace, monospace; font-size: 0.79rem; background: #ebebeb; padding: 0.05rem 0.3rem; border-radius: 3px; }
+
+    .empty {
+      padding: 2.5rem;
+      text-align: center;
+      color: #999;
+      font-style: italic;
+    }
+
+    @media (max-width: 900px) {
+      .ref-text { max-width: 200px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>vLLM Image Index</h1>
+  <p class="meta" id="meta">Loading...</p>
+
+  <div class="filters">
+    <div class="filter-group filter-group-rh">
+      <label>Red Hat provided</label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="f-supported">
+        Show Red Hat provided images only
+      </label>
+    </div>
+
+    <div class="filter-group">
+      <label>Version</label>
+      <select id="f-version"><option value="">All versions</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Hardware</label>
+      <select id="f-hardware"><option value="">All hardware</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Source</label>
+      <select id="f-source"><option value="">All sources</option></select>
+    </div>
+    <div class="filter-group">
+      <label>OS</label>
+      <select id="f-os"><option value="">All OS</option></select>
+    </div>
+
+    <button class="reset-btn" id="reset">Reset filters</button>
+    <button class="about-btn" id="about-toggle">About</button>
+  </div>
+
+  <div class="about-panel" id="about-panel">
+    <h3>Red Hat registries</h3>
+    <table>
+      <thead><tr><th>Source label</th><th>Registry path</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Red Hat (RHAI)</td>
+          <td><code>registry.redhat.io/rhaiis/vllm-*</code></td>
+          <td>Production releases, RHAI 3.0–3.3.x (pre-rebrand)</td>
+        </tr>
+        <tr>
+          <td>Red Hat (RHAI)</td>
+          <td><code>registry.redhat.io/rhaii/vllm-*</code></td>
+          <td>Production releases, RHAI 3.4+ ("Server" dropped from product name)</td>
+        </tr>
+        <tr>
+          <td>Red Hat (RHAI Preview)</td>
+          <td><code>registry.redhat.io/rhaiis-preview/vllm-*</code></td>
+          <td>Model-specific cherry-pick builds, pre-3.4 product line. Tags are model-named (e.g. <code>mistral-3-series</code>). Not for production use.</td>
+        </tr>
+        <tr>
+          <td>Red Hat (RHAI Preview)</td>
+          <td><code>registry.redhat.io/rhaii-preview/vllm-*</code></td>
+          <td>Model-specific cherry-pick builds, 3.4+ product line. Tags are model-named (e.g. <code>gemma4</code>). Not for production use.</td>
+        </tr>
+        <tr>
+          <td>Red Hat (RHAI Early Access)</td>
+          <td><code>registry.redhat.io/rhaii-early-access/vllm-*</code></td>
+          <td>Early Access releases for the 3.4+ product line</td>
+        </tr>
+      </tbody>
+    </table>
+    <h3>Upstream vLLM (DockerHub)</h3>
+    <table>
+      <thead><tr><th>Source label</th><th>Registry path</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Upstream vLLM (DockerHub)</td>
+          <td><code>docker.io/vllm/vllm-openai</code></td>
+          <td>CUDA. Versioned releases v0.5.2+</td>
+        </tr>
+        <tr>
+          <td>Upstream vLLM (DockerHub)</td>
+          <td><code>docker.io/vllm/vllm-openai-cpu</code></td>
+          <td>CPU. Versioned releases</td>
+        </tr>
+        <tr>
+          <td>Upstream vLLM (DockerHub)</td>
+          <td><code>docker.io/vllm/vllm-openai-rocm</code></td>
+          <td>ROCm. Versioned releases v0.25.0+</td>
+        </tr>
+        <tr>
+          <td>Upstream vLLM (DockerHub)</td>
+          <td><code>docker.io/vllm/vllm-openai-xpu</code></td>
+          <td>Intel XPU. Versioned releases v0.26.0+</td>
+        </tr>
+        <tr>
+          <td>Upstream vLLM (DockerHub)</td>
+          <td><code>docker.io/vllm/vllm-tpu</code></td>
+          <td>Google TPU and Ironwood. Versioned releases v0.11.1+</td>
+        </tr>
+      </tbody>
+    </table>
+    <h3>About image digests</h3>
+    <p style="margin:0 0 0.4rem">
+      The <strong>Digest</strong> column shows the <em>manifest index digest</em> — a content-addressable SHA256 hash of the image manifest list (or single manifest for single-arch images). This is the most stable way to pin an image to a specific version, regardless of tag mutability.
+    </p>
+    <p style="margin:0 0 0.4rem">
+      For <strong>DockerHub multi-arch images</strong> (e.g. <code>docker.io/vllm/vllm-openai</code>), the index digest covers <em>all platforms</em> (amd64, arm64, etc.) — it is <em>not</em> the same as the amd64-only platform digest. Use it with: <code>docker pull image@sha256:&lt;digest&gt;</code>
+    </p>
+    <p style="margin:0">
+      For <strong>Red Hat registry images</strong>, which are single-arch (amd64 only), the index digest and the platform digest are the same.
+    </p>
+  </div>
+
+  <div class="count" id="count"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="sortable" data-col="source">Source <span class="sort-ind">↕</span></th>
+        <th class="sortable" data-col="repository">Repository <span class="sort-ind">↕</span></th>
+        <th class="sortable" data-col="tag">Tag <span class="sort-ind">↕</span></th>
+        <th class="sortable" data-col="vllm_version">vLLM ver. <span class="sort-ind">↕</span></th>
+        <th class="sortable" data-col="hardware">Hardware <span class="sort-ind">↕</span></th>
+        <th class="sortable" data-col="os_name">OS <span class="sort-ind">↕</span></th>
+        <th>Digest</th>
+        <th>Image ref</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <script>
+    let data = null;
+
+    async function init() {
+      try {
+        const resp = await fetch('data.json');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        data = await resp.json();
+      } catch (e) {
+        document.getElementById('meta').textContent = 'Error: failed to load data.json.';
+        throw e;
+      }
+
+      document.getElementById('meta').textContent =
+        `Last updated: ${data.generated} · ${data.images.length} images indexed`;
+
+    function parseSemver(v) {
+      if (!v) return null;
+      return v.replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+    }
+
+    function cmpSemver(a, b) {
+      const ta = parseSemver(a), tb = parseSemver(b);
+      if (!ta && !tb) return 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      // Compare only up to the shorter version's length first
+      const minLen = Math.min(ta.length, tb.length);
+      for (let i = 0; i < minLen; i++) {
+        const d = tb[i] - ta[i];
+        if (d !== 0) return d;
+      }
+      // Shared prefix: shorter version wins (e.g. "3.3" sorts above "3.3.5")
+      return ta.length - tb.length;
+    }
+
+    // Default sort: vLLM desc → RHAI desc → EA desc → model-named alpha
+    const schemeOrder = { vllm: 0, rhai: 1, ea: 2, model: 3 };
+    const defaultSorted = [...data.images].sort((a, b) => {
+      const sd = schemeOrder[a.version_scheme] - schemeOrder[b.version_scheme];
+      if (sd !== 0) return sd;
+      if (a.version_scheme === 'model') return (a.tag || '').localeCompare(b.tag || '');
+      return cmpSemver(a.version, b.version);
+    });
+
+    // ── Sort state ─────────────────────────────────────────────────────────────
+    let sortCol = null; // null = default order
+    let sortDir = 'asc';
+
+    function colValue(img, col) {
+      switch (col) {
+        case 'source': return img.source_label || '';
+        case 'repository': return img.repository || '';
+        case 'tag': return img.tag || '';
+        case 'vllm_version':
+          return img.vllm_version || (img.version_scheme === 'vllm' ? img.version : '') || '';
+        case 'hardware': return img.hardware || '';
+        case 'os_name': return img.os_name || '';
+        default: return '';
+      }
+    }
+
+    const semverCols = new Set(['tag', 'vllm_version']);
+
+    function applySortToFiltered(rows) {
+      if (!sortCol) return rows;
+      return [...rows].sort((a, b) => {
+        const va = colValue(a, sortCol), vb = colValue(b, sortCol);
+        let cmp = 0;
+        if (semverCols.has(sortCol)) {
+          cmp = cmpSemver(va, vb);
+          if (cmp === 0) cmp = va.localeCompare(vb);
+        } else {
+          cmp = va.localeCompare(vb);
+        }
+        return sortDir === 'asc' ? -cmp : cmp;
+      });
+    }
+
+    function updateSortHeaders() {
+      document.querySelectorAll('thead th.sortable').forEach(th => {
+        const col = th.dataset.col;
+        const ind = th.querySelector('.sort-ind');
+        if (col === sortCol) {
+          th.classList.add('sorted');
+          ind.textContent = sortDir === 'asc' ? '↑' : '↓';
+        } else {
+          th.classList.remove('sorted');
+          ind.textContent = '↕';
+        }
+      });
+    }
+
+    document.querySelectorAll('thead th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (sortCol === col) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortCol = col;
+          sortDir = 'asc';
+        }
+        updateSortHeaders();
+        render();
+      });
+    });
+
+    // ── Build filter dropdowns ──────────────────────────────────────────────
+    function addOptgroup(sel, label, options) {
+      if (!options.length) return;
+      const g = document.createElement('optgroup');
+      g.label = label;
+      options.forEach(([val, text]) => {
+        const o = document.createElement('option');
+        o.value = val; o.textContent = text;
+        g.appendChild(o);
+      });
+      sel.appendChild(g);
+    }
+
+    const LEGACY_MINOR_THRESHOLD = 10;
+
+    function vllmVersionOptions() {
+      const minorSeen = new Set();
+      let hasLegacy = false;
+      const collectVersion = v => {
+        if (!v) return;
+        const parts = v.split('.');
+        const minor = parseInt(parts[1], 10);
+        if (parseInt(parts[0], 10) === 0 && minor <= LEGACY_MINOR_THRESHOLD) {
+          hasLegacy = true;
+        } else {
+          minorSeen.add(`${parts[0]}.${parts[1]}`);
+        }
+      };
+      defaultSorted.forEach(i => {
+        if (i.version_scheme === 'vllm') collectVersion(i.version);
+        if (i.vllm_version) collectVersion(i.vllm_version);
+      });
+      const options = [...minorSeen]
+        .sort((a, b) => {
+          const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+          for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+            const d = (pb[i] || 0) - (pa[i] || 0);
+            if (d !== 0) return d;
+          }
+          return 0;
+        })
+        .map(key => [`vllm-minor:${key}`, `vLLM ${key}.x`]);
+      if (hasLegacy) options.push([`vllm-legacy`, `vLLM ≤ v0.10.x`]);
+      return options;
+    }
+
+    function rhaiVersionOptions() {
+      const seen = new Set();
+      const allVersions = defaultSorted
+        .filter(i => i.version_scheme === 'rhai' && i.version)
+        .map(i => i.version)
+        .filter(v => seen.has(v) ? false : seen.add(v));
+      const minorSeen = new Set();
+      const options = [];
+      for (const v of allVersions) {
+        const parts = v.split('.');
+        const key = `${parts[0]}.${parts[1]}`;
+        if (!minorSeen.has(key)) {
+          minorSeen.add(key);
+          options.push([`rhai-minor:${key}`, `RHAI ${key}.x`]);
+        }
+      }
+      return options;
+    }
+
+    function eaVersionOptions() {
+      const seen = new Set();
+      const options = [];
+      defaultSorted
+        .filter(i => i.version_scheme === 'ea' && i.version)
+        .forEach(i => {
+          const m = i.version.match(/^(\d+\.\d+)(?:\.\d+)?(-ea\.\d+)$/i);
+          const key = m ? m[1] + m[2] : i.version;
+          if (!seen.has(key)) {
+            seen.add(key);
+            options.push([`ea-minor:${key}`, `RHAI ${key}`]);
+          }
+        });
+      return options;
+    }
+
+    function modelTagOptions() {
+      const seen = new Set();
+      const tags = [];
+      defaultSorted
+        .filter(i => i.version_scheme === 'model')
+        .map(i => i.tag)
+        .filter(v => seen.has(v) ? false : seen.add(v))
+        .sort()
+        .forEach(v => tags.push(v));
+      return tags;
+    }
+
+    const fvSel = document.getElementById('f-version');
+    addOptgroup(fvSel, 'RHAI versions', rhaiVersionOptions());
+    addOptgroup(fvSel, 'vLLM versions', vllmVersionOptions());
+    addOptgroup(fvSel, 'Early Access', eaVersionOptions());
+    addOptgroup(fvSel, 'Preview (model-named)', modelTagOptions().map(v => [`model:${v}`, v]));
+
+    function populateSelect(selId, values) {
+      const sel = document.getElementById(selId);
+      const unique = [...new Set(values)].sort();
+      unique.forEach(v => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = v;
+        sel.appendChild(o);
+      });
+    }
+
+    populateSelect('f-hardware', defaultSorted.map(i => i.hardware));
+    populateSelect('f-source', defaultSorted.map(i => i.source_label));
+
+    // OS filter: group by family (RHEL / Ubuntu / other), list exact versions
+    function populateOsFilter() {
+      const sel = document.getElementById('f-os');
+      const families = { rhel: [], ubuntu: [], other: [] };
+      const seen = new Set();
+      defaultSorted.forEach(i => {
+        if (!i.os_name || seen.has(i.os_name)) return;
+        seen.add(i.os_name);
+        const lower = i.os_name.toLowerCase();
+        if (lower.startsWith('rhel')) families.rhel.push(i.os_name);
+        else if (lower.startsWith('ubuntu')) families.ubuntu.push(i.os_name);
+        else families.other.push(i.os_name);
+      });
+      [['RHEL', families.rhel], ['Ubuntu', families.ubuntu], ['Other', families.other]].forEach(([label, vals]) => {
+        if (!vals.length) return;
+        const g = document.createElement('optgroup');
+        g.label = label;
+        vals.sort().forEach(v => {
+          const o = document.createElement('option');
+          o.value = v; o.textContent = v;
+          g.appendChild(o);
+        });
+        sel.appendChild(g);
+      });
+    }
+    populateOsFilter();
+
+    // ── Rendering ─────────────────────────────────────────────────────────────
+    function esc(str) {
+      return String(str)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function hwBadge(hw, cudaVersion) {
+      const title = cudaVersion ? ` title="CUDA ${esc(cudaVersion)}"` : '';
+      return `<span class="badge hw-${esc(hw)}"${title}>${esc(hw)}</span>`;
+    }
+
+    function osBadge(osName) {
+      if (!osName) return '<span style="color:#bbb">—</span>';
+      const lower = osName.toLowerCase();
+      const cls = lower.startsWith('rhel') ? 'os-rhel' : lower.startsWith('ubuntu') ? 'os-ubuntu' : 'os-other';
+      return `<span class="badge ${cls}">${esc(osName)}</span>`;
+    }
+
+    function render() {
+      const fv = document.getElementById('f-version').value;
+      const fh = document.getElementById('f-hardware').value;
+      const fs = document.getElementById('f-source').value;
+      const fo = document.getElementById('f-os').value;
+      const supportedOnly = document.getElementById('f-supported').checked;
+
+      let filtered = defaultSorted.filter(img => {
+        if (supportedOnly && img.registry !== 'registry.redhat.io') return false;
+        if (fh && img.hardware !== fh) return false;
+        if (fs && img.source_label !== fs) return false;
+        if (fo && img.os_name !== fo) return false;
+        if (fv) {
+          if (fv === 'vllm-legacy') {
+            if (img.version_scheme !== 'vllm' || !img.version) return false;
+            const parts = img.version.split('.');
+            return parseInt(parts[0], 10) === 0 && parseInt(parts[1], 10) <= LEGACY_MINOR_THRESHOLD;
+          }
+          if (fv.startsWith('vllm-minor:')) {
+            const prefix = fv.slice('vllm-minor:'.length);
+            if (img.version_scheme === 'vllm' && img.version)
+              return img.version.startsWith(prefix + '.');
+            if (img.vllm_version)
+              return img.vllm_version.startsWith(prefix + '.');
+            return false;
+          }
+          if (fv.startsWith('rhai-minor:')) {
+            const prefix = fv.slice('rhai-minor:'.length);
+            return img.version_scheme === 'rhai' && img.version &&
+              (img.version.startsWith(prefix + '.') || img.version === prefix);
+          }
+          if (fv.startsWith('ea-minor:')) {
+            const key = fv.slice('ea-minor:'.length);
+            if (img.version_scheme !== 'ea' || !img.version) return false;
+            const m = img.version.match(/^(\d+\.\d+)(?:\.\d+)?(-ea\.\d+)$/i);
+            const imgKey = m ? m[1] + m[2] : img.version;
+            return imgKey === key;
+          }
+          const colon = fv.indexOf(':');
+          const scheme = fv.slice(0, colon);
+          const val = fv.slice(colon + 1);
+          if (scheme === 'model') return img.version_scheme === 'model' && img.tag === val;
+          return img.version_scheme === scheme && img.version === val;
+        }
+        return true;
+      });
+
+      filtered = applySortToFiltered(filtered);
+
+      document.getElementById('count').textContent =
+        `Showing ${filtered.length} image${filtered.length !== 1 ? 's' : ''}`;
+
+      const tbody = document.getElementById('tbody');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">No images match the selected filters.</td></tr>';
+        return;
+      }
+
+      const rows = [];
+      filtered.forEach((img, idx) => {
+        const vllmVer = img.vllm_version
+          ? esc(img.vllm_version)
+          : (img.version_scheme === 'vllm' && img.version ? esc(img.version) : '<span style="color:#bbb">—</span>');
+
+        // Short digest (first 12 chars after sha256:)
+        const shortDigest = img.digest
+          ? img.digest.replace(/^sha256:/, '').slice(0, 12)
+          : null;
+        const digestCell = shortDigest
+          ? `<span class="mono" style="font-size:0.75rem;color:#555" title="${esc(img.digest)}">${esc(shortDigest)}</span>`
+          : '<span style="color:#bbb">—</span>';
+
+        // Build detail panel content
+        const detailParts = [];
+        if (img.build_date) {
+          detailParts.push(`<div class="detail-item"><span class="detail-label">Build date</span> ${esc(img.build_date)}</div>`);
+        }
+        if (img.digest) {
+          detailParts.push(`<div class="detail-item"><span class="detail-label">Index digest</span> <span class="mono" style="font-size:0.75rem">${esc(img.digest)}</span> <button class="copy-btn" data-copy="${esc(img.digest)}">Copy</button></div>`);
+        }
+
+        const hasDetail = img.build_date || img.digest;
+        const infoBtn = hasDetail
+          ? `<button class="info-btn" data-idx="${idx}" title="Build info">ℹ</button>`
+          : '';
+        const detailRow = hasDetail
+          ? `<tr class="detail-row" id="detail-${idx}" style="display:none"><td colspan="8"><div class="detail-content">${detailParts.join('')}</div></td></tr>`
+          : '';
+
+        rows.push(`
+        <tr>
+          <td>${esc(img.source_label)}</td>
+          <td class="mono">${esc(img.repository)}</td>
+          <td class="mono">${esc(img.tag)}</td>
+          <td class="mono">${vllmVer}</td>
+          <td>${hwBadge(img.hardware, img.cuda_version)}</td>
+          <td>${osBadge(img.os_name)}</td>
+          <td>${digestCell}</td>
+          <td>
+            <div class="ref-cell">
+              <span class="ref-text" title="${esc(img.pull)}">${esc(img.pull)}</span>
+              <button class="copy-btn" data-copy="${esc(img.pull)}">Copy</button>
+              ${infoBtn}
+            </div>
+          </td>
+        </tr>
+        ${detailRow}`);
+      });
+
+      tbody.innerHTML = rows.join('');
+
+      // Info button toggle
+      tbody.querySelectorAll('.info-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = btn.dataset.idx;
+          const row = document.getElementById(`detail-${idx}`);
+          const open = row.style.display === 'none';
+          row.style.display = open ? 'table-row' : 'none';
+          btn.classList.toggle('active', open);
+        });
+      });
+
+      // Copy buttons in detail rows
+      tbody.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+          });
+        });
+      });
+    }
+
+    ['f-version', 'f-hardware', 'f-source', 'f-os'].forEach(id => {
+      document.getElementById(id).addEventListener('change', render);
+    });
+    document.getElementById('f-supported').addEventListener('change', render);
+
+    document.getElementById('about-toggle').addEventListener('click', () => {
+      const btn = document.getElementById('about-toggle');
+      const panel = document.getElementById('about-panel');
+      const open = panel.classList.toggle('visible');
+      btn.classList.toggle('active', open);
+    });
+
+    document.getElementById('reset').addEventListener('click', () => {
+      ['f-version', 'f-hardware', 'f-source', 'f-os'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('f-supported').checked = false;
+      sortCol = null;
+      sortDir = 'asc';
+      updateSortHeaders();
+      render();
+    });
+
+      render();
+    }
+
+    init();
+  </script>
+</body>
+</html>

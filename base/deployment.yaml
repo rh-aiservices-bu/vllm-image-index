@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-image-index
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-image-index
+  template:
+    metadata:
+      labels:
+        app: vllm-image-index
+    spec:
+      serviceAccountName: vllm-image-index
+      containers:
+      - name: oauth-proxy
+        image: registry.redhat.io/openshift4/ose-oauth-proxy:latest
+        ports:
+        - name: https
+          containerPort: 8443
+        args:
+        - --provider=openshift
+        - --openshift-service-account=vllm-image-index
+        - --https-address=:8443
+        - --http-address=
+        - --upstream=http://127.0.0.1:8080
+        - --tls-cert=/etc/tls/private/tls.crt
+        - --tls-key=/etc/tls/private/tls.key
+        - --cookie-secret-file=/etc/oauth/cookie-secret
+        - --email-domain=*
+        volumeMounts:
+        - name: proxy-tls
+          mountPath: /etc/tls/private
+          readOnly: true
+        - name: oauth-cookie
+          mountPath: /etc/oauth
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+      - name: nginx
+        image: docker.io/nginx:alpine
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: app-data
+          mountPath: /usr/share/nginx/html
+          readOnly: true
+        - name: nginx-conf
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+      volumes:
+      - name: proxy-tls
+        secret:
+          secretName: vllm-image-index-proxy-tls
+      - name: oauth-cookie
+        secret:
+          secretName: vllm-image-index-oauth-cookie
+      - name: app-data
+        configMap:
+          name: vllm-image-data
+      - name: nginx-conf
+        configMap:
+          name: vllm-nginx-conf

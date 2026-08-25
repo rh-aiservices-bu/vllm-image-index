@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: vllm-image-index
+
+resources:
+- base/
+
+# vllm-image-data must be generated here (root) so app/index.html is accessible.
+# On first deploy, data.json are empty placeholders — the CronJob populates
+# them on first run and patches the ConfigMap directly via the Kubernetes API.
+configMapGenerator:
+- name: vllm-image-data
+  options:
+    disableNameSuffixHash: true
+  files:
+  - index.html=app/index.html
+  literals:
+  - data.json={}

@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vllm-fetch
+spec:
+  schedule: "0 6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 7200
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: vllm-fetch
+          restartPolicy: Never
+          containers:
+          - name: fetch
+            image: quay.io/willsparker/vllm-image-index-fetch:v0.4
+            imagePullPolicy: Always
+            env:
+            - name: WORKDIR
+              value: /tmp/workdir
+            - name: CM_NAME
+              value: vllm-image-data
+            volumeMounts:
+            - name: pull-secret
+              mountPath: /mnt/auth
+              readOnly: true
+            - name: cache
+              mountPath: /mnt/cache
+              readOnly: true
+            resources:
+              requests:
+                cpu: 250m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          volumes:
+          - name: pull-secret
+            secret:
+              secretName: rh-registry-pull-secret
+          - name: cache
+            configMap:
+              name: vllm-image-data
+              items:
+              - key: data.json
+                path: data.json
