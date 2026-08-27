@@ -1,6 +1,6 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 
-RUN microdnf install -y python3 skopeo tar && microdnf clean all
+RUN microdnf install -y python3 skopeo tar gzip && microdnf clean all
 
 WORKDIR /app
 COPY app/fetch.py .

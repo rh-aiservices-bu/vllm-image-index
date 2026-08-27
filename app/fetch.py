@@ -23,12 +23,34 @@ parser.add_argument("--skip-models", action="store_true", help="Skip model-named
 parser.add_argument("--auth-file", default=os.path.expanduser("~/.config/containers/auth.json"),
                     help="Path to container auth JSON (default: ~/.config/containers/auth.json)")
 parser.add_argument("--output-dir", default=".",
-                    help="Directory to write data.json and data.js (default: current directory)")
+                    help="Directory to write data.json (default: current directory)")
+parser.add_argument("--dockerhub-config", default=None,
+                    help="Path to a .dockerconfigjson file containing DockerHub credentials")
 args = parser.parse_args()
 SKIP_MODELS = args.skip_models
 
 AUTH_FILE = args.auth_file
 _OUTPUT_DIR = args.output_dir
+
+# Load DockerHub credentials from --dockerhub-config if provided.
+_DH_USER = None
+_DH_PASS = None
+if args.dockerhub_config and os.path.exists(args.dockerhub_config):
+    try:
+        with open(args.dockerhub_config) as _f:
+            _dh_cfg = json.load(_f)
+        for _key in ("docker.io", "index.docker.io", "https://index.docker.io/v1/"):
+            _entry = _dh_cfg.get("auths", {}).get(_key, {})
+            if _entry.get("auth"):
+                _decoded = base64.b64decode(_entry["auth"]).decode()
+                _DH_USER, _DH_PASS = _decoded.split(":", 1)
+                break
+        if _DH_USER:
+            print(f"  DockerHub credentials loaded for user: {_DH_USER}", file=sys.stderr)
+        else:
+            print("  Warning: --dockerhub-config provided but no docker.io credentials found", file=sys.stderr)
+    except Exception as e:
+        print(f"  Warning: failed to load --dockerhub-config: {e}", file=sys.stderr)
 RH_REGISTRY = "registry.redhat.io"
 PYPI_BASE = "https://packages.redhat.com/api/pypi/public-rhai/rhoai"
 
@@ -369,11 +391,11 @@ def dh_layer_os(repo, tag):
     - OS name: from /etc/os-release in the first layer (cached by layer digest).
     Returns {"os_name": str|None, "digest": str|None}.
     """
-    r = subprocess.run(
-        ["curl", "-sf",
-         f"https://auth.docker.io/token?service=registry.docker.io&scope=repository:{repo}:pull"],
-        capture_output=True, text=True,
-    )
+    token_cmd = ["curl", "-sf"]
+    if _DH_USER and _DH_PASS:
+        token_cmd += ["-u", f"{_DH_USER}:{_DH_PASS}"]
+    token_cmd.append(f"https://auth.docker.io/token?service=registry.docker.io&scope=repository:{repo}:pull")
+    r = subprocess.run(token_cmd, capture_output=True, text=True)
     if r.returncode != 0 or not r.stdout.strip():
         return {"os_name": None, "digest": None}
     token = json.loads(r.stdout).get("token")
@@ -454,19 +476,24 @@ def dh_layer_os(repo, tag):
                 capture_output=True, timeout=120,
             )
             if r.returncode != 0:
+                print(f"      [dh_layer_os] curl failed (rc={r.returncode}): {r.stderr.decode(errors='replace').strip()}", file=sys.stderr)
                 _dh_os_layer_cache[first_digest] = None
                 return {"os_name": None, "digest": index_digest}
-            subprocess.run(
-                ["tar", "-xzf", tmpfile, "-C", tmpdir],
+            tar_r = subprocess.run(
+                ["tar", "-xf", tmpfile, "-C", tmpdir],
                 capture_output=True, timeout=60,
             )
+            if tar_r.returncode != 0:
+                print(f"      [dh_layer_os] tar failed (rc={tar_r.returncode}): {tar_r.stderr.decode(errors='replace').strip()}", file=sys.stderr)
             os_release = os.path.join(tmpdir, "etc", "os-release")
             if not os.path.exists(os_release):
+                print(f"      [dh_layer_os] /etc/os-release not found in first layer of {repo}", file=sys.stderr)
                 _dh_os_layer_cache[first_digest] = None
                 return {"os_name": None, "digest": index_digest}
             with open(os_release) as f:
                 content = f.read()
-    except Exception:
+    except Exception as e:
+        print(f"      [dh_layer_os] exception: {e}", file=sys.stderr)
         _dh_os_layer_cache[first_digest] = None
         return {"os_name": None, "digest": index_digest}
 

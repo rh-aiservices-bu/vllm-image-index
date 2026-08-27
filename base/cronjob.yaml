@@ -17,7 +17,7 @@ spec:
           restartPolicy: Never
           containers:
           - name: fetch
-            image: quay.io/willsparker/vllm-image-index-fetch:v0.4
+            image: quay.io/willsparker/vllm-image-index-fetch:v0.6
             imagePullPolicy: Always
             env:
             - name: WORKDIR
@@ -27,6 +27,9 @@ spec:
             volumeMounts:
             - name: pull-secret
               mountPath: /mnt/auth
+              readOnly: true
+            - name: dockerhub-secret
+              mountPath: /mnt/dockerhub
               readOnly: true
             - name: cache
               mountPath: /mnt/cache
@@ -42,6 +45,9 @@ spec:
           - name: pull-secret
             secret:
               secretName: rh-registry-pull-secret
+          - name: dockerhub-secret
+            secret:
+              secretName: dockerhub-pull-secret
           - name: cache
             configMap:
               name: vllm-image-data
