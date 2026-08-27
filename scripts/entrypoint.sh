@@ -25,6 +25,7 @@ fi
 cd "$WORKDIR"
 python3 /app/fetch.py \
     --auth-file "$AUTH_FILE" \
+    --dockerhub-config /mnt/dockerhub/.dockerconfigjson \
     --output-dir "$WORKDIR"
 
 echo "fetch.py complete — patching ConfigMap $CM_NAME ..."
