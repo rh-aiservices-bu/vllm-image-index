@@ -121,12 +121,14 @@ def skopeo_inspect_labels(image_ref):
 
 
 def fetch_pypi_vllm_version(url):
-    """Query a PyPI simple index page and extract the base vLLM version from a wheel filename."""
+    """Query a PyPI simple index page and return the highest base vLLM version found."""
     result = subprocess.run(["curl", "-sf", url], capture_output=True, text=True)
     if result.returncode != 0 or not result.stdout.strip():
         return None
-    m = re.search(r'vllm-([\d.]+(?:rc\d+)?)[+%]', result.stdout)
-    return m.group(1) if m else None
+    versions = re.findall(r'vllm-([\d.]+(?:rc\d+)?)[+%]', result.stdout)
+    if not versions:
+        return None
+    return max(versions, key=semver_key)
 
 
 def hardware_from_repo(repo_name):
@@ -624,7 +626,16 @@ def resolve_vllm_mapping(images):
         display_name = img_entry["version"] or img_entry["tag"]
         image_ref = img_entry["pull"]
 
-        if image_ref in prior:
+        is_floating = bool(re.fullmatch(r'\d+\.\d+', img_entry["tag"]))
+        stale = False
+        if image_ref in prior and is_floating:
+            cached_digest = prior[image_ref].get("digest")
+            current_digest = skopeo_inspect(image_ref).get("Digest")
+            if current_digest and current_digest != cached_digest:
+                print(f"  {image_ref} (floating tag updated — re-inspecting)", file=sys.stderr)
+                stale = True
+
+        if image_ref in prior and not stale:
             print(f"  {image_ref} (cached)", file=sys.stderr)
             entry = prior[image_ref]
         else:

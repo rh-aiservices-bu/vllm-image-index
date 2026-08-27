@@ -17,7 +17,7 @@ spec:
           restartPolicy: Never
           containers:
           - name: fetch
-            image: quay.io/willsparker/vllm-image-index-fetch:v0.6
+            image: quay.io/willsparker/vllm-image-index-fetch:v0.8
             imagePullPolicy: Always
             env:
             - name: WORKDIR
