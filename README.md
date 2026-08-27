@@ -51,6 +51,29 @@ oc create secret generic rh-registry-pull-secret \
   -n vllm-image-index
 ```
 
+### `dockerhub-pull-secret`
+
+A `.dockerconfigjson` credential for DockerHub. The CronJob mounts this at `/mnt/dockerhub/.dockerconfigjson` and passes it to `fetch.py` via `--dockerhub-config`, allowing authenticated pulls to avoid rate limiting.
+
+**The Secret must exist in the namespace** even if you do not have DockerHub credentials, because the CronJob volume mount references it unconditionally.
+
+With credentials:
+
+```bash
+oc create secret generic dockerhub-pull-secret \
+  --from-file=.dockerconfigjson=$HOME/.docker/config.json \
+  --type=kubernetes.io/dockerconfigjson \
+  -n vllm-image-index
+```
+
+Without credentials (placeholder):
+
+```bash
+oc create secret generic dockerhub-pull-secret \
+  --from-literal=.dockerconfigjson='{"auths":{}}' \
+  -n vllm-image-index
+```
+
 ### `vllm-image-index-oauth-cookie`
 
 A random cookie secret for the OAuth proxy.
