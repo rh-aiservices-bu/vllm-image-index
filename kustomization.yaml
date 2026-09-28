@@ -5,14 +5,12 @@ namespace: vllm-image-index
 resources:
 - base/
 
-# vllm-image-data must be generated here (root) so app/index.html is accessible.
-# On first deploy, data.json are empty placeholders — the CronJob populates
-# them on first run and patches the ConfigMap directly via the Kubernetes API.
+# vllm-image-data is intentionally NOT managed here — it is created and patched
+# exclusively by the CronJob via the Kubernetes API. Managing it via kustomize
+# would reset data.json to {} on every deploy.
 configMapGenerator:
-- name: vllm-image-data
+- name: vllm-index-html
   options:
     disableNameSuffixHash: true
   files:
   - index.html=app/index.html
-  literals:
-  - data.json={}

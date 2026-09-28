@@ -166,6 +166,19 @@
     .info-btn:hover { background: #e8e8e8; }
     .info-btn.active { background: #1e40af; color: #fff; border-color: #1e40af; }
 
+    .os-btn {
+      flex-shrink: 0;
+      padding: 0.18rem 0.55rem;
+      font-size: 0.72rem;
+      border: 1px solid #93c5fd;
+      border-radius: 3px;
+      background: #eff6ff;
+      cursor: pointer;
+      color: #1e40af;
+      white-space: nowrap;
+    }
+    .os-btn:hover { background: #dbeafe; border-color: #60a5fa; }
+
     .badge {
       display: inline-block;
       padding: 0.15rem 0.45rem;
@@ -227,6 +240,122 @@
       color: #999;
       font-style: italic;
     }
+
+    /* ── Modal ──────────────────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-box {
+      background: #fff;
+      border-radius: 6px;
+      max-width: 760px;
+      width: 95%;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid #e5e5e5;
+      flex-shrink: 0;
+    }
+    .modal-title { font-size: 1rem; font-weight: 700; color: #1a1a1a; }
+    .modal-subtitle {
+      font-size: 0.78rem;
+      color: #666;
+      margin-top: 0.2rem;
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.1rem;
+      color: #888;
+      padding: 0 0.15rem;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-left: 1rem;
+    }
+    .modal-close:hover { color: #333; }
+    .modal-tabs {
+      display: flex;
+      border-bottom: 1px solid #e5e5e5;
+      flex-shrink: 0;
+      background: #fafafa;
+    }
+    .modal-tab {
+      padding: 0.55rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: none;
+      cursor: pointer;
+      color: #666;
+    }
+    .modal-tab:hover { color: #333; background: #f0f0f0; }
+    .modal-tab.active { color: #1a1a1a; border-bottom-color: #1a1a1a; font-weight: 600; }
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .modal-note {
+      font-size: 0.78rem;
+      color: #555;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 4px;
+      padding: 0.5rem 0.75rem;
+      margin: 0;
+      line-height: 1.5;
+    }
+    .modal-note code {
+      font-family: ui-monospace, monospace;
+      font-size: 0.75rem;
+      background: #fef3c7;
+      padding: 0.05rem 0.25rem;
+      border-radius: 2px;
+    }
+    .yaml-pre {
+      font-family: ui-monospace, 'Cascadia Code', monospace;
+      font-size: 0.75rem;
+      background: #f7f7f7;
+      border: 1px solid #e5e5e5;
+      border-radius: 4px;
+      padding: 0.75rem;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 0;
+      line-height: 1.5;
+      tab-size: 2;
+    }
+    .modal-copy-btn {
+      align-self: flex-start;
+      padding: 0.35rem 0.85rem;
+      font-size: 0.8rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #f5f5f5;
+      cursor: pointer;
+    }
+    .modal-copy-btn:hover { background: #e8e8e8; }
+    .modal-copy-btn.copied { background: #d4edda; border-color: #b8dfc5; color: #155724; }
 
     @media (max-width: 900px) {
       .ref-text { max-width: 200px; }
@@ -297,6 +426,11 @@
           <td><code>registry.redhat.io/rhaii-early-access/vllm-*</code></td>
           <td>Early Access releases for the 3.4+ product line</td>
         </tr>
+        <tr>
+          <td>Red Hat (RHAI Fast)</td>
+          <td><code>registry.redhat.io/rhaii-fast/vllm-*</code></td>
+          <td>Fast-track releases for the 3.4+ product line. Tags are versioned (e.g. <code>3.6.0-fast.1</code>).</td>
+        </tr>
       </tbody>
     </table>
     <h3>Upstream vLLM (DockerHub)</h3>
@@ -355,13 +489,184 @@
         <th class="sortable" data-col="os_name">OS <span class="sort-ind">↕</span></th>
         <th>Digest</th>
         <th>Image ref</th>
+        <th></th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
   </table>
 
+  <!-- Add to OpenShift modal -->
+  <div class="modal-overlay" id="yaml-modal" style="display:none">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Add to OpenShift</div>
+          <div class="modal-subtitle" id="modal-subtitle"></div>
+        </div>
+        <button class="modal-close" id="modal-close" title="Close">✕</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="modal-tab" id="tab-sr">ServingRuntime CR</button>
+        <button class="modal-tab active" id="tab-tmpl">Template CR</button>
+      </div>
+      <div class="modal-body">
+        <div id="panel-sr" style="display:none">
+          <pre class="yaml-pre" id="yaml-sr"></pre>
+        </div>
+        <div id="panel-tmpl">
+          <p class="modal-note">Apply this Template CR to the <code>redhat-ods-applications</code> namespace to make this runtime selectable via the RHOAI dashboard. Use the <strong>ServingRuntime CR</strong> tab instead to apply directly to a data science project namespace.</p>
+          <pre class="yaml-pre" id="yaml-tmpl"></pre>
+        </div>
+        <button class="modal-copy-btn" id="modal-copy-btn">Copy YAML</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let data = null;
+    let renderedImages = [];
+    let currentTab = 'tmpl';
+
+    // ── YAML helpers ───────────────────────────────────────────────────────────
+    function randChars(n) {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      return Array.from({length: n}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    }
+
+    function slugify(s) {
+      return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    }
+
+    function accelFor(hw) {
+      const map = { cuda: '["nvidia.com/gpu"]', rocm: '["amd.com/gpu"]', gaudi: '["habana.ai/gaudi"]' };
+      return map[hw] || '';
+    }
+
+    function buildSrYaml(img) {
+      const ver = img.vllm_version || img.version || img.tag;
+      const srName = 'vllm-' + img.hardware + '-' + slugify(img.tag);
+      const displayName = `(Custom) vLLM v${ver} ${img.hardware.toUpperCase()} ServingRuntime for KServe`;
+      const accel = accelFor(img.hardware);
+
+      let annotations = `    opendatahub.io/accelerator-name: ''
+    opendatahub.io/apiProtocol: REST`;
+      if (accel) {
+        annotations += `\n    opendatahub.io/recommended-accelerators: '${accel}'`;
+      }
+      annotations += `\n    opendatahub.io/runtime-version: 'v${ver}'`;
+      annotations += `\n    opendatahub.io/template-display-name: ${srName}
+    opendatahub.io/template-name: ${srName}
+    openshift.io/display-name: '${displayName}'`;
+
+      return `apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: ${srName}
+  annotations:
+${annotations}
+  labels:
+    opendatahub.io/dashboard: 'true'
+spec:
+  annotations:
+    prometheus.io/path: /metrics
+    prometheus.io/port: '8080'
+  containers:
+    - args:
+        - '--port=8080'
+        - '--model=/mnt/models'
+      env:
+        - name: HF_HOME
+          value: /tmp/hf_home
+      image: '${img.pull}'
+      name: kserve-container
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+      volumeMounts:
+        - mountPath: /dev/shm
+          name: shm
+  multiModel: false
+  supportedModelFormats:
+    - autoSelect: true
+      name: vLLM
+  volumes:
+    - emptyDir:
+        medium: Memory
+        sizeLimit: 24Gi
+      name: shm`;
+    }
+
+    function buildTemplateYaml(img, srYaml) {
+      const templateName = 'template-' + randChars(6);
+      const indentedSr = srYaml.split('\n')
+        .map((line, i) => (i === 0 ? '  - ' : '    ') + line)
+        .join('\n');
+
+      return `apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: ${templateName}
+  namespace: redhat-ods-applications
+  labels:
+    opendatahub.io/dashboard: 'true'
+  annotations:
+    opendatahub.io/apiProtocol: REST
+    opendatahub.io/model-type: '["generative"]'
+    opendatahub.io/modelServingSupport: '["single"]'
+objects:
+${indentedSr}`;
+    }
+
+    // ── Modal ──────────────────────────────────────────────────────────────────
+    function closeModal() {
+      document.getElementById('yaml-modal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('panel-sr').style.display = tab === 'sr' ? 'block' : 'none';
+      document.getElementById('panel-tmpl').style.display = tab === 'tmpl' ? 'block' : 'none';
+      document.getElementById('tab-sr').classList.toggle('active', tab === 'sr');
+      document.getElementById('tab-tmpl').classList.toggle('active', tab === 'tmpl');
+    }
+
+    function openYamlModal(img) {
+      const srYaml = buildSrYaml(img);
+      const tmplYaml = buildTemplateYaml(img, srYaml);
+      const ver = img.vllm_version || img.version || img.tag;
+      const displayName = `(Custom) vLLM v${ver} ${img.hardware.toUpperCase()} ServingRuntime for KServe`;
+
+      document.getElementById('modal-subtitle').textContent = displayName;
+      document.getElementById('yaml-sr').textContent = srYaml;
+      document.getElementById('yaml-tmpl').textContent = tmplYaml;
+
+      switchTab('tmpl');
+
+      document.getElementById('yaml-modal').style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+
+    // Modal event listeners (set up once)
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    document.getElementById('yaml-modal').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
+    document.getElementById('tab-sr').addEventListener('click', () => switchTab('sr'));
+    document.getElementById('tab-tmpl').addEventListener('click', () => switchTab('tmpl'));
+    document.getElementById('modal-copy-btn').addEventListener('click', function() {
+      const yaml = currentTab === 'sr'
+        ? document.getElementById('yaml-sr').textContent
+        : document.getElementById('yaml-tmpl').textContent;
+      navigator.clipboard.writeText(yaml).then(() => {
+        this.textContent = 'Copied!';
+        this.classList.add('copied');
+        setTimeout(() => { this.textContent = 'Copy YAML'; this.classList.remove('copied'); }, 1500);
+      });
+    });
 
     async function init() {
       try {
@@ -371,6 +676,13 @@
       } catch (e) {
         document.getElementById('meta').textContent = 'Error: failed to load data.json.';
         throw e;
+      }
+
+      if (!data.images || data.images.length === 0) {
+        document.getElementById('meta').textContent = 'No data yet — run the fetch CronJob first.';
+        document.getElementById('count').textContent = '';
+        document.getElementById('tbody').innerHTML = '<tr><td colspan="9" class="empty">No image data available. Trigger the CronJob to populate the index.</td></tr>';
+        return;
       }
 
       document.getElementById('meta').textContent =
@@ -396,8 +708,8 @@
       return ta.length - tb.length;
     }
 
-    // Default sort: vLLM desc → RHAI desc → EA desc → model-named alpha
-    const schemeOrder = { vllm: 0, rhai: 1, ea: 2, model: 3 };
+    // Default sort: vLLM desc → RHAI desc → Fast desc → EA desc → model-named alpha
+    const schemeOrder = { vllm: 0, rhai: 1, fast: 2, ea: 3, model: 4 };
     const defaultSorted = [...data.images].sort((a, b) => {
       const sd = schemeOrder[a.version_scheme] - schemeOrder[b.version_scheme];
       if (sd !== 0) return sd;
@@ -532,6 +844,22 @@
       return options;
     }
 
+    function fastVersionOptions() {
+      const seen = new Set();
+      const options = [];
+      defaultSorted
+        .filter(i => i.version_scheme === 'fast' && i.version)
+        .forEach(i => {
+          const m = i.version.match(/^(\d+\.\d+\.\d+)(-fast\.\d+)$/i);
+          const key = m ? m[1] + m[2] : i.version;
+          if (!seen.has(key)) {
+            seen.add(key);
+            options.push([`fast:${key}`, `RHAI ${key}`]);
+          }
+        });
+      return options;
+    }
+
     function eaVersionOptions() {
       const seen = new Set();
       const options = [];
@@ -563,6 +891,7 @@
     const fvSel = document.getElementById('f-version');
     addOptgroup(fvSel, 'RHAI versions', rhaiVersionOptions());
     addOptgroup(fvSel, 'vLLM versions', vllmVersionOptions());
+    addOptgroup(fvSel, 'Fast releases', fastVersionOptions());
     addOptgroup(fvSel, 'Early Access', eaVersionOptions());
     addOptgroup(fvSel, 'Preview (model-named)', modelTagOptions().map(v => [`model:${v}`, v]));
 
@@ -663,6 +992,13 @@
             const imgKey = m ? m[1] + m[2] : img.version;
             return imgKey === key;
           }
+          if (fv.startsWith('fast:')) {
+            const key = fv.slice('fast:'.length);
+            if (img.version_scheme !== 'fast' || !img.version) return false;
+            const m = img.version.match(/^(\d+\.\d+\.\d+)(-fast\.\d+)$/i);
+            const imgKey = m ? m[1] + m[2] : img.version;
+            return imgKey === key;
+          }
           const colon = fv.indexOf(':');
           const scheme = fv.slice(0, colon);
           const val = fv.slice(colon + 1);
@@ -673,6 +1009,7 @@
       });
 
       filtered = applySortToFiltered(filtered);
+      renderedImages = filtered;
 
       document.getElementById('count').textContent =
         `Showing ${filtered.length} image${filtered.length !== 1 ? 's' : ''}`;
@@ -680,7 +1017,7 @@
       const tbody = document.getElementById('tbody');
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty">No images match the selected filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="empty">No images match the selected filters.</td></tr>';
         return;
       }
 
@@ -712,7 +1049,7 @@
           ? `<button class="info-btn" data-idx="${idx}" title="Build info">ℹ</button>`
           : '';
         const detailRow = hasDetail
-          ? `<tr class="detail-row" id="detail-${idx}" style="display:none"><td colspan="8"><div class="detail-content">${detailParts.join('')}</div></td></tr>`
+          ? `<tr class="detail-row" id="detail-${idx}" style="display:none"><td colspan="9"><div class="detail-content">${detailParts.join('')}</div></td></tr>`
           : '';
 
         rows.push(`
@@ -731,6 +1068,7 @@
               ${infoBtn}
             </div>
           </td>
+          <td><button class="os-btn" data-idx="${idx}">Add to OpenShift</button></td>
         </tr>
         ${detailRow}`);
       });
@@ -748,7 +1086,7 @@
         });
       });
 
-      // Copy buttons in detail rows
+      // Copy buttons in table rows and detail rows
       tbody.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           navigator.clipboard.writeText(btn.dataset.copy).then(() => {
@@ -757,6 +1095,11 @@
             setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
           });
         });
+      });
+
+      // Add to OpenShift buttons
+      tbody.querySelectorAll('.os-btn').forEach(btn => {
+        btn.addEventListener('click', () => openYamlModal(renderedImages[+btn.dataset.idx]));
       });
     }
 
