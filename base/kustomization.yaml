@@ -9,8 +9,6 @@ resources:
 - route.yaml
 - cronjob.yaml
 
-# nginx configuration only — vllm-image-data ConfigMap is generated in the root
-# kustomization.yaml (where app/index.html is accessible)
 configMapGenerator:
 - name: vllm-nginx-conf
   options:

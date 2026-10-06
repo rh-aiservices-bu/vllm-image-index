@@ -76,6 +76,11 @@ RH_NAMESPACES = [
         "vllm-tpu-rhel9", "vllm-neuron-rhel9", "vllm-spyre-rhel9",
         "vllm-gaudi-rhel9",
     ]),
+    ("rhaii-fast", "Red Hat (RHAI Fast)", [
+        "vllm-cuda-rhel9", "vllm-rocm-rhel9", "vllm-cpu-rhel9",
+        "vllm-tpu-rhel9", "vllm-neuron-rhel9", "vllm-spyre-rhel9",
+        "vllm-gaudi-rhel9",
+    ]),
 ]
 
 # (repo, hardware, source_label)
@@ -150,6 +155,10 @@ def is_semver(tag):
     return bool(re.fullmatch(r"\d+(\.\d+)+", tag))
 
 
+def is_fast_tag(tag):
+    return bool(re.fullmatch(r"\d+\.\d+\.\d+-fast\.\d+", tag))
+
+
 def dockerhub_tags(repo):
     return skopeo_list_tags(f"docker.io/{repo}")
 
@@ -172,6 +181,7 @@ def semver_key(v):
 
 
 EA_NAMESPACES = {"rhaii-early-access", "rhaiis-early-access"}
+FAST_NAMESPACES = {"rhaii-fast"}
 
 # Cache layer digest → vllm version (or None if not found) to avoid re-downloading
 # layers shared between image tags (e.g. floating minor tag and its latest patch).
@@ -588,7 +598,7 @@ def resolve_vllm_mapping(images):
     """
     combos = {}
     for img in images:
-        if img["version_scheme"] in ("rhai", "ea") and img["version"]:
+        if img["version_scheme"] in ("rhai", "ea", "fast") and img["version"]:
             key = f"{img['version']}:{img['hardware']}"
             combos[key] = img
         elif img["version_scheme"] == "model" and not SKIP_MODELS:
@@ -716,7 +726,7 @@ def resolve_vllm_mapping(images):
             img_entry["digest"] = entry["digest"]
         else:
             for img in images:
-                if img["version_scheme"] in ("rhai", "ea") and img["version"]:
+                if img["version_scheme"] in ("rhai", "ea", "fast") and img["version"]:
                     if f"{img['version']}:{img['hardware']}" == combo_key:
                         img["vllm_version"] = entry["vllm_version"]
                         img["build_date"] = entry["build_date"]
@@ -739,18 +749,21 @@ for namespace, source_label, repos in RH_NAMESPACES:
         tags = skopeo_list_tags(image_ref)
         hw = hardware_from_repo(repo)
         is_ea_ns = namespace in EA_NAMESPACES
+        is_fast_ns = namespace in FAST_NAMESPACES
         for tag in tags:
             if rh_tag_excluded(tag):
                 continue
             if is_ea_ns:
                 version_scheme = "ea"
+            elif is_fast_ns:
+                version_scheme = "fast" if is_fast_tag(tag) else "model"
             else:
                 version_scheme = "rhai" if is_semver(tag) else "model"
             images.append({
                 "registry": RH_REGISTRY,
                 "repository": full_repo,
                 "tag": tag,
-                "version": tag if version_scheme in ("rhai", "ea") else None,
+                "version": tag if version_scheme in ("rhai", "ea", "fast") else None,
                 "version_scheme": version_scheme,
                 "hardware": hw,
                 "source_label": source_label,

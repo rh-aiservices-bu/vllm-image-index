@@ -48,8 +48,11 @@ spec:
         ports:
         - containerPort: 8080
         volumeMounts:
-        - name: app-data
+        - name: app-static
           mountPath: /usr/share/nginx/html
+          readOnly: true
+        - name: app-data
+          mountPath: /usr/share/nginx/data
           readOnly: true
         - name: nginx-conf
           mountPath: /etc/nginx/nginx.conf
@@ -81,6 +84,9 @@ spec:
       - name: oauth-cookie
         secret:
           secretName: vllm-image-index-oauth-cookie
+      - name: app-static
+        configMap:
+          name: vllm-index-html
       - name: app-data
         configMap:
           name: vllm-image-data
