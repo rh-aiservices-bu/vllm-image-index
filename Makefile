@@ -11,7 +11,4 @@ push:
 	podman push $(IMAGE):$(TAG)
 
 deploy:
-	oc create configmap vllm-image-data \
-	  --from-literal=data.json='{}' \
-	  -n $(NAMESPACE) 2>/dev/null || true
-	oc apply -k .
+	NAMESPACE=$(NAMESPACE) bash scripts/deploy.sh
