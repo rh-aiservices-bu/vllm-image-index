@@ -66,7 +66,7 @@ fi
 # 6. Apply
 echo ""
 echo "Applying kustomization..."
-oc apply -k .
+oc apply -k . -n "$NAMESPACE"
 
 # 7. Seed data if configmap is empty
 DATA=$(oc get configmap vllm-image-data -n "$NAMESPACE" -o jsonpath='{.data.data\.json}' 2>/dev/null || echo "")
